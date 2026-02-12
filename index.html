@@ -92,7 +92,7 @@
     <script type="text/babel" data-type="module">
       import React, { useState, useEffect, useMemo, useRef } from 'react';
       import ReactDOM from 'react-dom/client';
-      import { Plus, Settings, ChevronLeft, ChevronRight, Trash2, Layers, List, X, Check, Download, Upload, AlertTriangle, Smartphone, RefreshCw, Pencil, Palette, Archive } from 'lucide-react';
+      import { Plus, Settings, ChevronLeft, ChevronRight, Trash2, Layers, List, X, Check, Download, Upload, AlertTriangle, Smartphone, RefreshCw, Pencil, Palette, Archive, AlertCircle } from 'lucide-react';
       import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
       // --- CONSTANTS & DEFAULTS ---
@@ -133,7 +133,7 @@
         { id: 'year', label: 'Año' },
       ];
 
-      // --- UTILS: DATE ---
+      // --- UTILS ---
       const formatDate = (date) => date.toISOString().split('T')[0];
       const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
@@ -190,7 +190,6 @@
         return newDate;
       };
 
-      // --- UTILS: CSV ---
       const exportTransactionsToCSV = (transactions, categories) => {
         const headers = ['ID', 'Fecha', 'Tipo', 'Categoria', 'Cantidad', 'Nota', 'CategoriaID'];
         const rows = transactions.map(t => {
@@ -449,7 +448,6 @@
         }, [isOpen, initialType]);
 
         if (!isOpen) return null;
-        // Filter out archived categories for the Add Menu
         const availableCategories = categories.filter(c => c.type === type && !c.isArchived);
 
         const handleSubmit = (e) => {
@@ -505,7 +503,8 @@
 
       const CategoryManagerModal = ({ isOpen, onClose, categories, onUpdateCategories, transactions }) => {
         const [activeTab, setActiveTab] = useState('expense');
-        const [editingCategory, setEditingCategory] = useState(null); // null = list mode, object = edit/create mode
+        const [editingCategory, setEditingCategory] = useState(null);
+        const [categoryToDelete, setCategoryToDelete] = useState(null);
         
         // Form state
         const [formName, setFormName] = useState('');
@@ -513,25 +512,50 @@
         const [formColor, setFormColor] = useState('');
 
         useEffect(() => {
-            if(!isOpen) setEditingCategory(null);
+            if(!isOpen) {
+                setEditingCategory(null);
+                setCategoryToDelete(null);
+            }
         }, [isOpen]);
 
         if (!isOpen) return null;
 
         const currentList = categories.filter(c => c.type === activeTab && !c.isArchived);
 
-        const handleEdit = (cat) => {
+        // -- Handlers --
+        const handleEditClick = (cat) => {
             setEditingCategory(cat);
             setFormName(cat.name);
             setFormIcon(cat.icon);
             setFormColor(cat.color);
         };
 
-        const handleCreate = () => {
+        const handleCreateClick = () => {
              setEditingCategory({ id: 'new', type: activeTab });
              setFormName('');
              setFormIcon('🏷️');
              setFormColor(COLORS[0]);
+        };
+
+        const handleDeleteClick = (cat) => {
+            setCategoryToDelete(cat);
+        };
+
+        const confirmDelete = () => {
+             if(!categoryToDelete) return;
+             const id = categoryToDelete.id;
+             const isUsed = transactions.some(t => t.categoryId === id);
+
+             if(isUsed) {
+                 // Archive
+                 const newCategories = categories.map(c => c.id === id ? { ...c, isArchived: true } : c);
+                 onUpdateCategories(newCategories);
+             } else {
+                 // Hard Delete
+                 const newCategories = categories.filter(c => c.id !== id);
+                 onUpdateCategories(newCategories);
+             }
+             setCategoryToDelete(null);
         };
 
         const handleSave = (e) => {
@@ -541,7 +565,6 @@
             let newCategories = [...categories];
 
             if (editingCategory.id === 'new') {
-                // Create
                 newCategories.push({
                     id: `${activeTab}_${generateId()}`,
                     name: formName.toUpperCase(),
@@ -551,7 +574,6 @@
                     isArchived: false
                 });
             } else {
-                // Update
                 newCategories = newCategories.map(c => 
                     c.id === editingCategory.id 
                     ? { ...c, name: formName.toUpperCase(), icon: formIcon, color: formColor }
@@ -562,29 +584,39 @@
             setEditingCategory(null);
         };
 
-        const handleDelete = (id) => {
-             // Smart Delete Logic:
-             // 1. Check if category is used in any transactions
-             const isUsed = transactions.some(t => t.categoryId === id);
-
-             if(isUsed) {
-                 if(confirm('Esta categoría tiene transacciones asociadas. Se archivará (desaparecerá del menú pero se mantendrá el historial). ¿Continuar?')) {
-                     const newCategories = categories.map(c => 
-                        c.id === id ? { ...c, isArchived: true } : c
-                     );
-                     onUpdateCategories(newCategories);
-                 }
-             } else {
-                 if(confirm('Esta categoría NO se ha usado nunca. ¿Quieres eliminarla permanentemente?')) {
-                     const newCategories = categories.filter(c => c.id !== id);
-                     onUpdateCategories(newCategories);
-                 }
-             }
-        };
+        // -- Delete Confirmation View --
+        if (categoryToDelete) {
+             const isUsed = transactions.some(t => t.categoryId === categoryToDelete.id);
+             return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-6 animate-fade-in">
+                    <div className="bg-surface w-full max-w-xs rounded-2xl p-6 border border-white/10 text-center">
+                        <div className="w-16 h-16 bg-error/20 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                             🗑️
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-2">
+                            {isUsed ? '¿Archivar Categoría?' : '¿Eliminar Categoría?'}
+                        </h3>
+                        <p className="text-sm text-gray-400 mb-6">
+                            {isUsed 
+                                ? `"${categoryToDelete.name}" tiene transacciones. Se ocultará del menú, pero el historial se conservará.` 
+                                : `"${categoryToDelete.name}" no se usa. Se eliminará permanentemente.`
+                            }
+                        </p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 bg-white/10 text-white rounded-xl font-medium">Cancelar</button>
+                            <button onClick={confirmDelete} className="flex-1 py-3 bg-error text-white rounded-xl font-bold shadow-lg">
+                                {isUsed ? 'Archivar' : 'Eliminar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+             );
+        }
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-surface w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up border border-white/10 max-h-[85vh] flex flex-col">
+            <div className="bg-surface w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up border border-white/10 max-h-[85vh] flex flex-col relative">
+              
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                    {editingCategory ? (editingCategory.id === 'new' ? 'Nueva Categoría' : 'Editar Categoría') : 'Gestionar Categorías'}
@@ -601,22 +633,25 @@
                         <button onClick={() => setActiveTab('income')} className={`flex-1 py-2 rounded-lg font-medium transition-colors ${activeTab === 'income' ? 'bg-income text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Ingresos</button>
                     </div>
                     
-                    <div className="overflow-y-auto no-scrollbar flex-1 space-y-2 pr-1">
+                    <div className="overflow-y-auto no-scrollbar flex-1 space-y-2 pr-1 min-h-[200px]">
+                        {currentList.length === 0 && (
+                            <div className="text-center text-gray-500 py-8 text-sm">No hay categorías visibles.</div>
+                        )}
                         {currentList.map(cat => (
                             <div key={cat.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between group">
                                 <div className="flex items-center gap-3">
-                                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-lg" style={{backgroundColor: `${cat.color}33`}}>{cat.icon}</span>
+                                    <span className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{backgroundColor: `${cat.color}33`}}>{cat.icon}</span>
                                     <span className="font-medium text-sm text-white">{cat.name}</span>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleEdit(cat)} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white"><Pencil size={16} /></button>
-                                    <button onClick={() => handleDelete(cat.id)} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-error"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleEditClick(cat)} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10"><Pencil size={18} /></button>
+                                    <button onClick={() => handleDeleteClick(cat)} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-error hover:bg-error/10"><Trash2 size={18} /></button>
                                 </div>
                             </div>
                         ))}
                     </div>
                     
-                    <button onClick={handleCreate} className="mt-4 w-full py-3 bg-primary text-black font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 shrink-0">
+                    <button onClick={handleCreateClick} className="mt-4 w-full py-3 bg-primary text-black font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 shrink-0">
                         <Plus size={20} /> Crear Categoría
                     </button>
                  </>
@@ -628,9 +663,16 @@
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs text-gray-500 mb-1 uppercase font-bold">Icono (Emoji)</label>
+                              <label className="block text-xs text-gray-500 mb-1 uppercase font-bold">Icono</label>
                               <div className="relative">
-                                  <input type="text" value={formIcon} onChange={e => setFormIcon(e.target.value)} className="w-full bg-background border border-white/10 rounded-xl p-3 text-center text-2xl focus:border-primary" placeholder="🏷️" />
+                                  {/* Improved Input for Emojis */}
+                                  <input 
+                                    type="text" 
+                                    value={formIcon} 
+                                    onChange={e => setFormIcon(e.target.value)} 
+                                    className="w-full bg-background border border-white/10 rounded-xl p-3 text-center text-3xl focus:border-primary h-[54px]" 
+                                    placeholder="🏷️" 
+                                  />
                               </div>
                           </div>
                           <div>
@@ -717,7 +759,7 @@
               <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white flex items-center gap-2"><Settings className="text-primary" size={24} /> Ajustes</h2><button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white"><X size={20} /></button></div>
               <div className="space-y-4">
                 
-                <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between" onClick={() => { onClose(); onOpenCategories(); }}>
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between active:bg-white/10 transition-colors cursor-pointer" onClick={() => { onClose(); onOpenCategories(); }}>
                     <div>
                         <h3 className="font-semibold text-gray-200">Categorías</h3>
                         <p className="text-[10px] text-gray-500">Crear, editar o eliminar</p>
@@ -813,7 +855,6 @@
         const handleClearAllData = () => {
              setTransactions([]);
              localStorage.removeItem('finvibe_transactions');
-             // Optionally reset categories too, but user probably wants to keep custom cats
              if(confirm('¿Quieres resetear también las categorías a las predeterminadas?')) {
                  setCategories(DEFAULT_CATEGORIES);
              }
