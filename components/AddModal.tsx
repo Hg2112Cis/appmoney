@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
-import { TransactionType } from '../types';
+import { X, Check, CalendarClock } from 'lucide-react';
+import { TransactionType, RecurrenceFrequency } from '../types';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 
 interface AddModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (amount: number, categoryId: string, note: string, date: string, type: TransactionType) => void;
+  onSave: (amount: number, categoryId: string, note: string, date: string, type: TransactionType, recurrence: RecurrenceFrequency) => void;
   initialType?: TransactionType;
 }
 
@@ -16,6 +16,7 @@ export const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave, ini
   const [categoryId, setCategoryId] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [recurrence, setRecurrence] = useState<RecurrenceFrequency>('none');
 
   // Reset state when modal opens
   useEffect(() => {
@@ -25,6 +26,7 @@ export const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave, ini
       setNote('');
       setCategoryId('');
       setDate(new Date().toISOString().split('T')[0]);
+      setRecurrence('none');
     }
   }, [isOpen, initialType]);
 
@@ -36,7 +38,7 @@ export const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave, ini
     e.preventDefault();
     if (!amount || !categoryId) return;
     
-    onSave(parseFloat(amount), categoryId, note, date, type);
+    onSave(parseFloat(amount), categoryId, note, date, type, recurrence);
     onClose();
   };
 
@@ -118,16 +120,37 @@ export const AddModal: React.FC<AddModalProps> = ({ isOpen, onClose, onSave, ini
                 className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary"
               />
             </div>
+            
             <div>
-              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Nota (Opcional)</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Detalles..."
-                className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary"
-              />
+              <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Repetir</label>
+              <div className="relative">
+                <select
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value as RecurrenceFrequency)}
+                  className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary appearance-none"
+                >
+                  <option value="none">No repetir</option>
+                  <option value="daily">Diariamente</option>
+                  <option value="weekly">Semanalmente</option>
+                  <option value="monthly">Mensualmente</option>
+                  <option value="yearly">Anualmente</option>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <CalendarClock size={16} />
+                </div>
+              </div>
             </div>
+          </div>
+          
+          <div>
+            <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Nota (Opcional)</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Detalles..."
+              className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary"
+            />
           </div>
 
           <button

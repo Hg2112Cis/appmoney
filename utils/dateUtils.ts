@@ -1,4 +1,4 @@
-import { TimePeriod } from '../types';
+import { TimePeriod, RecurrenceFrequency } from '../types';
 
 export const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
@@ -32,7 +32,6 @@ export const filterTransactionsByPeriod = <T extends { date: string }>(
   period: TimePeriod
 ): T[] => {
   const targetTime = currentDate.getTime();
-  const getStartOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   
   return items.filter(item => {
     const itemDate = new Date(item.date);
@@ -80,4 +79,28 @@ export const shiftDate = (date: Date, period: TimePeriod, direction: 1 | -1): Da
       break;
   }
   return newDate;
+};
+
+export const getNextRecurrenceDate = (dateStr: string, frequency: RecurrenceFrequency): string => {
+  const date = new Date(dateStr);
+  
+  switch (frequency) {
+    case 'daily':
+      date.setDate(date.getDate() + 1);
+      break;
+    case 'weekly':
+      date.setDate(date.getDate() + 7);
+      break;
+    case 'monthly':
+      date.setMonth(date.getMonth() + 1);
+      break;
+    case 'yearly':
+      date.setFullYear(date.getFullYear() + 1);
+      break;
+    case 'none':
+    default:
+      return dateStr;
+  }
+  
+  return formatDate(date);
 };

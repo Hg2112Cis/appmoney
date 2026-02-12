@@ -2,6 +2,8 @@ export type TransactionType = 'expense' | 'income';
 
 export type TimePeriod = 'day' | 'week' | 'month' | 'year';
 
+export type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export interface Category {
   id: string;
   name: string;
@@ -16,6 +18,9 @@ export interface Transaction {
   categoryId: string;
   date: string; // ISO string
   note: string;
+  recurrence?: RecurrenceFrequency; // Frequency rule
+  nextOccurrence?: string; // ISO string for the next trigger date
+  parentTransactionId?: string; // If this was generated from a recurring one
 }
 
 export interface PeriodStats {

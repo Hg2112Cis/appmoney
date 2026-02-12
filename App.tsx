@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Settings } from 'lucide-react';
-import { Transaction, TimePeriod, TransactionType } from './types';
+import { Transaction, TimePeriod, TransactionType, RecurrenceFrequency } from './types';
 import { ALL_CATEGORIES } from './constants';
-import { filterTransactionsByPeriod, shiftDate } from './utils/dateUtils';
+import { filterTransactionsByPeriod, shiftDate, getNextRecurrenceDate, formatDate } from './utils/dateUtils';
 import { PeriodSelector } from './components/PeriodSelector';
 import { DateNavigation } from './components/DateNavigation';
 import { SummaryCards } from './components/SummaryCards';
@@ -36,12 +36,71 @@ const App: React.FC = () => {
     localStorage.setItem('finvibe_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
+  // --- RECURRENCE ENGINE ---
+  useEffect(() => {
+    const processRecurring = () => {
+      const today = new Date();
+      const todayStr = formatDate(today);
+      let hasChanges = false;
+      let newTransactions = [...transactions];
+
+      // We use a simple loop. If the user hasn't opened app in 3 months, 
+      // we need to generate 3 transactions.
+      
+      // Filter masters that are recurring and have a next occurrence due
+      const processMasters = () => {
+        let loopChanges = false;
+        
+        // We map to find indexes or modify objects directly in the array copy
+        for (let i = 0; i < newTransactions.length; i++) {
+          const t = newTransactions[i];
+          
+          // Check if it's a recurring master with a due date
+          if (t.recurrence && t.recurrence !== 'none' && t.nextOccurrence) {
+            
+            // While the next occurrence is in the past or today
+            while (t.nextOccurrence <= todayStr) {
+               loopChanges = true;
+               hasChanges = true;
+               
+               // 1. Create the new transaction instance
+               const newInstance: Transaction = {
+                 id: crypto.randomUUID(),
+                 amount: t.amount,
+                 categoryId: t.categoryId,
+                 note: t.note + ' (Auto)',
+                 date: t.nextOccurrence,
+                 recurrence: 'none', // Instances don't recur, only the master does
+                 parentTransactionId: t.id
+               };
+               
+               newTransactions.push(newInstance);
+               
+               // 2. Calculate next date for the master
+               const nextDate = getNextRecurrenceDate(t.nextOccurrence, t.recurrence);
+               
+               // Update master in place
+               t.nextOccurrence = nextDate;
+            }
+          }
+        }
+      };
+
+      processMasters();
+
+      if (hasChanges) {
+        setTransactions(newTransactions);
+      }
+    };
+
+    processRecurring();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount (and logically, it depends on transactions state, but we want to avoid infinite loops, so we handle state update carefully)
+
   // Listen for PWA install event
   useEffect(() => {
     const handler = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setInstallPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handler);
@@ -53,25 +112,39 @@ const App: React.FC = () => {
     setCurrentDate(prev => shiftDate(prev, period, direction));
   };
 
-  const handleAddTransaction = (amount: number, categoryId: string, note: string, date: string, type: TransactionType) => {
+  const handleAddTransaction = (
+    amount: number, 
+    categoryId: string, 
+    note: string, 
+    date: string, 
+    type: TransactionType,
+    recurrence: RecurrenceFrequency
+  ) => {
+    
+    // If recurrence is selected, we calculate the NEXT date immediately
+    const nextOccurrence = recurrence !== 'none' 
+      ? getNextRecurrenceDate(date, recurrence) 
+      : undefined;
+
     const newTransaction: Transaction = {
       id: crypto.randomUUID(),
       amount,
       categoryId,
       note,
       date,
+      recurrence,
+      nextOccurrence
     };
     setTransactions(prev => [...prev, newTransaction]);
   };
 
   const handleDeleteTransaction = (id: string) => {
+    // If we delete a master recurring transaction, future auto-generations stop naturally
+    // because the master is gone.
     setTransactions(prev => prev.filter(t => t.id !== id));
   };
 
   const handleImportTransactions = (imported: Transaction[]) => {
-    // Merge strategy: Add all imported. 
-    // Ideally we might check for duplicates by ID, but for simplicity we append.
-    // If IDs collide, we can filter.
     setTransactions(prev => {
       const existingIds = new Set(prev.map(t => t.id));
       const newUnique = imported.filter(t => !existingIds.has(t.id));
