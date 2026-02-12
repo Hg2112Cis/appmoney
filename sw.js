@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finvibe-v8-bundled';
+const CACHE_NAME = 'finvibe-v9-bundled';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

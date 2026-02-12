@@ -135,6 +135,7 @@
 
       // --- UTILS: DATE ---
       const formatDate = (date) => date.toISOString().split('T')[0];
+      const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
       const getPeriodLabel = (date, period) => {
         const locale = 'es-ES';
@@ -225,17 +226,15 @@
           const amount = parseFloat(amountStr.replace(',', '.'));
           if (isNaN(amount)) continue;
           let finalCatId = catId;
-          // Fallback logic if ID doesn't exist in current categories
           if (!finalCatId || !categories.find(c => c.id === finalCatId)) {
              const found = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
              if (found) finalCatId = found.id;
              else {
-               // Preserve ID even if unknown, TransactionList will handle generic display
                finalCatId = catId || 'unknown';
              }
           }
           transactions.push({
-            id: id && id.length > 5 ? id : crypto.randomUUID(),
+            id: id && id.length > 5 ? id : generateId(),
             date: date,
             amount: amount,
             categoryId: finalCatId,
@@ -305,10 +304,7 @@
           let incTotal = 0;
           transactions.forEach(t => {
             const cat = categories.find(c => c.id === t.categoryId);
-            // Allow calculation even if category is archived, as long as it exists in history
             const amount = Number(t.amount);
-            // If category is deleted (not in list at all), we might skip or group into "Others"
-            // For now, assume it's lost if not in list, or handle archived
             if (!cat) return; 
 
             if (cat.type === 'expense') {
@@ -369,7 +365,6 @@
           const map = new Map();
           transactions.forEach((t) => {
             const cat = categories.find((c) => c.id === t.categoryId);
-            // Even if cat is undefined (shouldn't happen with our Soft Delete), we handle it
             const catId = cat ? cat.id : 'unknown';
             const catName = cat ? cat.name : 'Desconocido/Archivado';
             const catIcon = cat ? cat.icon : '📦';
@@ -508,7 +503,7 @@
         );
       };
 
-      const CategoryManagerModal = ({ isOpen, onClose, categories, onUpdateCategories }) => {
+      const CategoryManagerModal = ({ isOpen, onClose, categories, onUpdateCategories, transactions }) => {
         const [activeTab, setActiveTab] = useState('expense');
         const [editingCategory, setEditingCategory] = useState(null); // null = list mode, object = edit/create mode
         
@@ -548,7 +543,7 @@
             if (editingCategory.id === 'new') {
                 // Create
                 newCategories.push({
-                    id: `${activeTab}_${crypto.randomUUID().slice(0, 8)}`,
+                    id: `${activeTab}_${generateId()}`,
                     name: formName.toUpperCase(),
                     icon: formIcon,
                     color: formColor,
@@ -568,12 +563,22 @@
         };
 
         const handleDelete = (id) => {
-             // Soft Delete: Mark as Archived
-             if(confirm('¿Seguro que quieres borrar esta categoría? Se ocultará del menú, pero las transacciones antiguas se conservarán.')) {
-                 const newCategories = categories.map(c => 
-                    c.id === id ? { ...c, isArchived: true } : c
-                 );
-                 onUpdateCategories(newCategories);
+             // Smart Delete Logic:
+             // 1. Check if category is used in any transactions
+             const isUsed = transactions.some(t => t.categoryId === id);
+
+             if(isUsed) {
+                 if(confirm('Esta categoría tiene transacciones asociadas. Se archivará (desaparecerá del menú pero se mantendrá el historial). ¿Continuar?')) {
+                     const newCategories = categories.map(c => 
+                        c.id === id ? { ...c, isArchived: true } : c
+                     );
+                     onUpdateCategories(newCategories);
+                 }
+             } else {
+                 if(confirm('Esta categoría NO se ha usado nunca. ¿Quieres eliminarla permanentemente?')) {
+                     const newCategories = categories.filter(c => c.id !== id);
+                     onUpdateCategories(newCategories);
+                 }
              }
         };
 
@@ -625,7 +630,7 @@
                           <div>
                               <label className="block text-xs text-gray-500 mb-1 uppercase font-bold">Icono (Emoji)</label>
                               <div className="relative">
-                                  <input type="text" value={formIcon} onChange={e => setFormIcon(e.target.value)} className="w-full bg-background border border-white/10 rounded-xl p-3 text-center text-2xl focus:border-primary" maxLength="2" placeholder="🏷️" />
+                                  <input type="text" value={formIcon} onChange={e => setFormIcon(e.target.value)} className="w-full bg-background border border-white/10 rounded-xl p-3 text-center text-2xl focus:border-primary" placeholder="🏷️" />
                               </div>
                           </div>
                           <div>
@@ -800,7 +805,7 @@
 
         const handleNavigate = (direction) => setCurrentDate(prev => shiftDate(prev, period, direction));
         const handleAddTransaction = (amount, categoryId, note, date) => {
-          const newTransaction = { id: crypto.randomUUID(), amount, categoryId, note, date };
+          const newTransaction = { id: generateId(), amount, categoryId, note, date };
           setTransactions(prev => [...prev, newTransaction]);
         };
         const handleDeleteTransaction = (id) => setTransactions(prev => prev.filter(t => t.id !== id));
@@ -893,6 +898,7 @@
                 onClose={() => setIsCategoryModalOpen(false)}
                 categories={categories}
                 onUpdateCategories={setCategories}
+                transactions={transactions}
             />
           </div>
         );
