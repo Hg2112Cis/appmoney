@@ -25,6 +25,7 @@
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2382/2382533.png">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2382/2382533.png">
 
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -48,53 +49,570 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Babel for in-browser compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
       body {
         background-color: #121212;
         color: #E0E0E0;
         font-family: 'Inter', sans-serif;
         -webkit-tap-highlight-color: transparent;
-        overscroll-behavior-y: none; /* Prevents pull-to-refresh effect */
-        user-select: none; /* App-like feel */
+        overscroll-behavior-y: none;
+        user-select: none;
       }
-      /* Hide scrollbar for clean horizontal scrolling */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      /* Smooth transitions for modals */
-      .animate-slide-up {
-        animation: slideUp 0.3s ease-out;
-      }
-      @keyframes slideUp {
-        from { transform: translateY(100%); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
-      .animate-fade-in {
-        animation: fadeIn 0.3s ease-out;
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .animate-slide-up { animation: slideUp 0.3s ease-out; }
+      @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
-  <script type="importmap">
+
+    <!-- Import Map for Modules -->
+    <script type="importmap">
 {
   "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+    "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "recharts": "https://esm.sh/recharts@^3.7.0"
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+
+    <!-- APP LOGIC BUNDLED HERE -->
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect, useMemo, useRef } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { Plus, Settings, ChevronLeft, ChevronRight, Trash2, Layers, List, X, Check, Download, Upload, AlertTriangle, Smartphone } from 'lucide-react';
+      import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+
+      // --- CONSTANTS ---
+      const EXPENSE_CATEGORIES = [
+        { id: 'exp_asesor', name: 'ASESOR', icon: '⚖️', color: '#FF7043', type: 'expense' },
+        { id: 'exp_sustituciones', name: 'SUSTITUCIONES', icon: '🔄', color: '#FFA726', type: 'expense' },
+        { id: 'exp_loteria', name: 'LOTERIA', icon: '🎰', color: '#AB47BC', type: 'expense' },
+        { id: 'exp_bicicleta', name: 'BICICLETA', icon: '🚲', color: '#26C6DA', type: 'expense' },
+        { id: 'exp_salud', name: 'SALUD', icon: '🏥', color: '#EF5350', type: 'expense' },
+        { id: 'exp_coche', name: 'COCHE', icon: '🚗', color: '#78909C', type: 'expense' },
+        { id: 'exp_restaurante', name: 'RESTAURANTE', icon: '🍴', color: '#FFCA28', type: 'expense' },
+        { id: 'exp_ocio', name: 'OCIO', icon: '🎭', color: '#5C6BC0', type: 'expense' },
+        { id: 'exp_impuestos', name: 'IMPUESTOS', icon: '💸', color: '#8D6E63', type: 'expense' },
+        { id: 'exp_viajes', name: 'VIAJES', icon: '✈️', color: '#42A5F5', type: 'expense' },
+        { id: 'exp_ropa', name: 'ROPA', icon: '👕', color: '#EC407A', type: 'expense' },
+      ];
+
+      const INCOME_CATEGORIES = [
+        { id: 'inc_minuta', name: 'MINUTA', icon: '📄', color: '#66BB6A', type: 'income' },
+        { id: 'inc_sustituciones', name: 'SUSTITUCIONES', icon: '🔄', color: '#9CCC65', type: 'income' },
+        { id: 'inc_costas', name: 'COSTAS', icon: '🏛️', color: '#26A69A', type: 'income' },
+        { id: 'inc_turnos', name: 'TURNOS', icon: '📅', color: '#29B6F6', type: 'income' },
+        { id: 'inc_devoluciones', name: 'DEVOLUCIONES', icon: '💰', color: '#7E57C2', type: 'income' },
+      ];
+
+      const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
+
+      const PERIODS = [
+        { id: 'day', label: 'Día' },
+        { id: 'week', label: 'Semana' },
+        { id: 'month', label: 'Mes' },
+        { id: 'year', label: 'Año' },
+      ];
+
+      // --- UTILS: DATE ---
+      const formatDate = (date) => date.toISOString().split('T')[0];
+
+      const getPeriodLabel = (date, period) => {
+        const locale = 'es-ES';
+        switch (period) {
+          case 'day': return date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+          case 'week': {
+            const start = new Date(date);
+            const day = start.getDay() || 7;
+            if (day !== 1) start.setHours(-24 * (day - 1));
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            return `${start.getDate()} ${start.toLocaleDateString(locale, { month: 'short' })} - ${end.getDate()} ${end.toLocaleDateString(locale, { month: 'short' })}`;
+          }
+          case 'month': return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+          case 'year': return date.getFullYear().toString();
+          default: return '';
+        }
+      };
+
+      const filterTransactionsByPeriod = (items, currentDate, period) => {
+        const targetTime = currentDate.getTime();
+        return items.filter(item => {
+          const itemDate = new Date(item.date);
+          const itemTime = itemDate.getTime();
+          switch (period) {
+            case 'day': return itemDate.toDateString() === currentDate.toDateString();
+            case 'week': {
+              const start = new Date(currentDate);
+              const day = start.getDay() || 7;
+              if (day !== 1) start.setHours(-24 * (day - 1));
+              else start.setHours(0,0,0,0);
+              const end = new Date(start);
+              end.setDate(start.getDate() + 6);
+              end.setHours(23, 59, 59, 999);
+              return itemTime >= start.getTime() && itemTime <= end.getTime();
+            }
+            case 'month': return itemDate.getMonth() === currentDate.getMonth() && itemDate.getFullYear() === currentDate.getFullYear();
+            case 'year': return itemDate.getFullYear() === currentDate.getFullYear();
+            default: return false;
+          }
+        });
+      };
+
+      const shiftDate = (date, period, direction) => {
+        const newDate = new Date(date);
+        switch (period) {
+          case 'day': newDate.setDate(date.getDate() + direction); break;
+          case 'week': newDate.setDate(date.getDate() + (direction * 7)); break;
+          case 'month': newDate.setMonth(date.getMonth() + direction); break;
+          case 'year': newDate.setFullYear(date.getFullYear() + direction); break;
+        }
+        return newDate;
+      };
+
+      // --- UTILS: CSV ---
+      const exportTransactionsToCSV = (transactions) => {
+        const headers = ['ID', 'Fecha', 'Tipo', 'Categoria', 'Cantidad', 'Nota', 'CategoriaID'];
+        const rows = transactions.map(t => {
+          const category = ALL_CATEGORIES.find(c => c.id === t.categoryId);
+          const categoryName = category ? category.name : 'Desconocido';
+          const type = category ? (category.type === 'expense' ? 'Gasto' : 'Ingreso') : 'Gasto';
+          const cleanNote = t.note ? `"${t.note.replace(/"/g, '""')}"` : '';
+          const cleanCatName = `"${categoryName}"`;
+          return [t.id, t.date, type, cleanCatName, t.amount.toString(), cleanNote, t.categoryId].join(',');
+        });
+        return [headers.join(','), ...rows].join('\n');
+      };
+
+      const parseCSVToTransactions = (csvText) => {
+        const lines = csvText.trim().split('\n');
+        if (lines.length < 2) return [];
+        const transactions = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.trim()) continue;
+          const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          if (cols.length < 5) continue;
+          const [id, date, typeStr, catName, amountStr, note, catId] = cols;
+          const amount = parseFloat(amountStr);
+          if (isNaN(amount)) continue;
+          let finalCatId = catId;
+          if (!finalCatId || !ALL_CATEGORIES.find(c => c.id === finalCatId)) {
+             const found = ALL_CATEGORIES.find(c => c.name.toLowerCase() === catName.toLowerCase());
+             if (found) finalCatId = found.id;
+             else finalCatId = 'exp_ocio';
+          }
+          transactions.push({
+            id: id && id.length > 5 ? id : crypto.randomUUID(),
+            date: date,
+            amount: amount,
+            categoryId: finalCatId,
+            note: note || ''
+          });
+        }
+        return transactions;
+      };
+
+      // --- COMPONENTS ---
+      
+      const PeriodSelector = ({ currentPeriod, onChange }) => (
+        <div className="flex bg-surface rounded-2xl p-1 shadow-sm w-full">
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onChange(p.id)}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all duration-200 ${
+                currentPeriod === p.id ? 'bg-primary text-black shadow-md' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      );
+
+      const DateNavigation = ({ currentDate, period, onNavigate }) => (
+        <div className="flex items-center justify-between px-2 py-0">
+          <button onClick={() => onNavigate(-1)} className="p-1 rounded-full bg-surface text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <h2 className="text-sm font-bold text-white capitalize">{getPeriodLabel(currentDate, period)}</h2>
+          <button onClick={() => onNavigate(1)} className="p-1 rounded-full bg-surface text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      );
+
+      const SummaryCards = ({ stats }) => (
+        <div className="grid grid-cols-2 gap-2 px-4">
+          <div className="col-span-2 bg-surface p-3 rounded-2xl shadow-lg border border-white/5 relative overflow-hidden flex items-center justify-between">
+             <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none"></div>
+             <div className="z-10">
+               <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">Balance Total</p>
+               <p className={`text-2xl font-bold mt-0.5 ${stats.balance >= 0 ? 'text-white' : 'text-error'}`}>
+                  {stats.balance >= 0 ? '' : '-'}${Math.abs(stats.balance).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+               </p>
+             </div>
+          </div>
+          <div className="bg-surface p-3 rounded-2xl shadow-md border-l-4 border-income">
+            <p className="text-gray-400 text-[10px] uppercase tracking-wide">Ingresos</p>
+            <p className="text-income text-base font-bold mt-0.5">+${stats.income.toLocaleString()}</p>
+          </div>
+          <div className="bg-surface p-3 rounded-2xl shadow-md border-l-4 border-expense">
+            <p className="text-gray-400 text-[10px] uppercase tracking-wide">Gastos</p>
+            <p className="text-expense text-base font-bold mt-0.5">-${stats.expense.toLocaleString()}</p>
+          </div>
+        </div>
+      );
+
+      const ChartSection = ({ transactions, activeType, onToggle }) => {
+        const { expenseData, incomeData, expenseTotal, incomeTotal } = useMemo(() => {
+          const expenses = {};
+          const incomes = {};
+          let expTotal = 0;
+          let incTotal = 0;
+          transactions.forEach(t => {
+            const cat = ALL_CATEGORIES.find(c => c.id === t.categoryId);
+            if (!cat) return;
+            const amount = Number(t.amount);
+            if (cat.type === 'expense') {
+              expenses[cat.id] = (expenses[cat.id] || 0) + amount;
+              expTotal += amount;
+            } else {
+              incomes[cat.id] = (incomes[cat.id] || 0) + amount;
+              incTotal += amount;
+            }
+          });
+          const formatData = (map) => Object.keys(map).map(id => {
+            const cat = ALL_CATEGORIES.find(c => c.id === id);
+            return { name: cat?.name || 'Desconocido', value: map[id], color: cat?.color || '#888' };
+          }).sort((a, b) => b.value - a.value);
+          return { expenseData: formatData(expenses), incomeData: formatData(incomes), expenseTotal: expTotal, incomeTotal: incTotal };
+        }, [transactions]);
+
+        if (expenseTotal === 0 && incomeTotal === 0) {
+          return <div className="flex flex-col items-center justify-center h-52 text-gray-500 text-sm"><p>No hay datos en este periodo</p></div>;
+        }
+
+        const outerData = activeType === 'expense' ? expenseData : incomeData;
+        const innerData = activeType === 'expense' ? incomeData : expenseData;
+
+        return (
+          <div className="h-52 w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={innerData} cx="50%" cy="50%" innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value" stroke="none" opacity={0.3}>
+                  {innerData.map((entry, index) => <Cell key={`cell-inner-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Pie data={outerData} cx="50%" cy="50%" innerRadius={65} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none" opacity={1}>
+                  {outerData.map((entry, index) => <Cell key={`cell-outer-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={(value) => `$${value.toLocaleString()}`} contentStyle={{ backgroundColor: '#1E1E1E', borderColor: '#333', borderRadius: '8px', color: '#fff' }} itemStyle={{ color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <button onClick={onToggle} className="pointer-events-auto flex flex-col items-center justify-center w-24 h-24 rounded-full bg-background/50 hover:bg-background/80 backdrop-blur-sm transition-all active:scale-95 group border border-white/5">
+                 <div className={`flex flex-col items-center ${activeType === 'expense' ? 'order-1' : 'order-3'}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${activeType === 'expense' ? 'text-expense' : 'text-income'}`}>{activeType === 'expense' ? 'Gastos' : 'Ingresos'}</span>
+                    <span className={`text-base font-bold ${activeType === 'expense' ? 'text-expense' : 'text-income'}`}>${(activeType === 'expense' ? expenseTotal : incomeTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                 </div>
+                 <div className="w-6 h-[1px] bg-white/20 my-0.5 order-2"></div>
+                 <div className={`flex flex-col items-center ${activeType === 'expense' ? 'order-3 opacity-50' : 'order-1 opacity-50'}`}>
+                    <span className="text-[8px] font-medium uppercase tracking-widest text-gray-400">{activeType === 'expense' ? 'Ingresos' : 'Gastos'}</span>
+                    <span className="text-xs font-medium text-gray-400">${(activeType === 'expense' ? incomeTotal : expenseTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                 </div>
+              </button>
+            </div>
+          </div>
+        );
+      };
+
+      const TransactionList = ({ transactions, onDelete }) => {
+        const [viewMode, setViewMode] = useState('categories');
+        const groupedData = useMemo(() => {
+          const map = new Map();
+          transactions.forEach((t) => {
+            const cat = ALL_CATEGORIES.find((c) => c.id === t.categoryId);
+            if (!cat) return;
+            const current = map.get(cat.id) || { category: cat, total: 0, count: 0 };
+            map.set(cat.id, { category: cat, total: current.total + Number(t.amount), count: current.count + 1 });
+          });
+          return Array.from(map.values()).sort((a, b) => b.total - a.total);
+        }, [transactions]);
+        const sortedHistory = useMemo(() => {
+          return [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        }, [transactions]);
+
+        if (transactions.length === 0) {
+          return <div className="text-center py-10 px-4"><div className="inline-block p-4 rounded-full bg-surface mb-3"><span className="text-2xl grayscale opacity-50">💸</span></div><p className="text-gray-500">No hay transacciones para este periodo.</p></div>;
+        }
+
+        return (
+          <div className="px-4 pb-24">
+            <div className="flex bg-surface p-1 rounded-xl mb-4">
+              <button onClick={() => setViewMode('categories')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${viewMode === 'categories' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}><Layers size={16} /> Categorías</button>
+              <button onClick={() => setViewMode('history')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${viewMode === 'history' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}><List size={16} /> Historial</button>
+            </div>
+            {viewMode === 'categories' && (
+              <div className="space-y-3 animate-fade-in">
+                {groupedData.map(({ category, total, count }) => {
+                   const isExpense = category.type === 'expense';
+                   return (
+                    <div key={category.id} className="bg-surface rounded-xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ backgroundColor: `${category.color}33` }}>{category.icon}</div>
+                        <div><p className="font-semibold text-white">{category.name}</p><p className="text-xs text-gray-500">{count} {count === 1 ? 'transacción' : 'transacciones'}</p></div>
+                      </div>
+                      <span className={`font-bold text-lg ${isExpense ? 'text-expense' : 'text-income'}`}>{isExpense ? '-' : '+'}${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {viewMode === 'history' && (
+              <div className="space-y-3 animate-fade-in">
+                {sortedHistory.map((transaction) => {
+                  const category = ALL_CATEGORIES.find((c) => c.id === transaction.categoryId);
+                  const isExpense = category?.type === 'expense';
+                  return (
+                    <div key={transaction.id} className="bg-surface rounded-xl p-4 flex items-center justify-between shadow-sm group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-opacity-20" style={{ backgroundColor: `${category?.color}33` }}>{category?.icon}</div>
+                        <div><p className="font-semibold text-white">{category?.name}</p><p className="text-xs text-gray-500">{new Date(transaction.date).toLocaleDateString()}{transaction.note ? ` • ${transaction.note}` : ''}</p></div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`font-bold ${isExpense ? 'text-expense' : 'text-income'}`}>{isExpense ? '-' : '+'}${transaction.amount.toLocaleString()}</span>
+                        <button onClick={() => onDelete(transaction.id)} className="text-gray-600 hover:text-error transition-colors p-2 rounded-full hover:bg-white/5"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const AddModal = ({ isOpen, onClose, onSave, initialType = 'expense' }) => {
+        const [type, setType] = useState(initialType);
+        const [amount, setAmount] = useState('');
+        const [categoryId, setCategoryId] = useState('');
+        const [note, setNote] = useState('');
+        const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+        useEffect(() => {
+          if (isOpen) {
+            setType(initialType);
+            setAmount('');
+            setNote('');
+            setCategoryId('');
+            setDate(new Date().toISOString().split('T')[0]);
+          }
+        }, [isOpen, initialType]);
+
+        if (!isOpen) return null;
+        const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          if (!amount || !categoryId) return;
+          onSave(parseFloat(amount), categoryId, note, date, type);
+          onClose();
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4">
+            <div className="bg-surface w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">Nueva Transacción</h2>
+                <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white"><X size={20} /></button>
+              </div>
+              <div className="flex bg-black/30 p-1 rounded-xl mb-6">
+                <button onClick={() => { setType('expense'); setCategoryId(''); }} className={`flex-1 py-3 rounded-lg font-medium transition-colors ${type === 'expense' ? 'bg-expense text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Gasto</button>
+                <button onClick={() => { setType('income'); setCategoryId(''); }} className={`flex-1 py-3 rounded-lg font-medium transition-colors ${type === 'income' ? 'bg-income text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Ingreso</button>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Cantidad</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400 font-light">$</span>
+                    <input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-background border border-white/10 rounded-xl py-4 pl-10 pr-4 text-3xl font-bold text-white focus:outline-none focus:border-primary placeholder-gray-600" autoFocus />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wide font-bold">Categoría</label>
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto no-scrollbar">
+                    {categories.map((cat) => (
+                      <button key={cat.id} type="button" onClick={() => setCategoryId(cat.id)} className={`flex flex-col items-center p-2 rounded-xl border transition-all ${categoryId === cat.id ? 'bg-white/10 border-primary scale-105' : 'bg-transparent border-transparent hover:bg-white/5'}`}>
+                        <span className="text-2xl mb-1">{cat.icon}</span>
+                        <span className="text-[10px] text-gray-400 truncate w-full text-center">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Fecha</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary" /></div>
+                  <div><label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Nota</label><input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalles..." className="w-full bg-background border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-primary" /></div>
+                </div>
+                <button type="submit" disabled={!amount || !categoryId} className="w-full py-4 mt-4 bg-primary text-black font-bold text-lg rounded-xl shadow-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"><Check size={20} /> Guardar</button>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      const DataModal = ({ isOpen, onClose, transactions, onImport, installPrompt, onInstallClear }) => {
+        const fileInputRef = useRef(null);
+        const [importStatus, setImportStatus] = useState('');
+        if (!isOpen) return null;
+        const handleExport = () => {
+          const csvContent = exportTransactionsToCSV(transactions);
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `FinVibe_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+        const handleFileChange = (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const parsedTransactions = parseCSVToTransactions(event.target?.result);
+              if (parsedTransactions.length > 0) {
+                onImport(parsedTransactions);
+                setImportStatus(`¡Éxito! ${parsedTransactions.length} transacciones.`);
+                setTimeout(() => { onClose(); setImportStatus(''); }, 1500);
+              } else setImportStatus('Error: No hay datos válidos.');
+            } catch (err) { setImportStatus('Error al leer el archivo.'); }
+          };
+          reader.readAsText(file);
+        };
+        const handleInstall = async () => {
+          if (!installPrompt) return;
+          installPrompt.prompt();
+          const { outcome } = await installPrompt.userChoice;
+          if (onInstallClear) onInstallClear();
+          if (outcome === 'accepted') onClose();
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-surface w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up border border-white/10">
+              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white flex items-center gap-2"><Settings className="text-primary" size={24} /> Ajustes</h2><button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white"><X size={20} /></button></div>
+              <div className="space-y-4">
+                {installPrompt && (
+                  <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-4 rounded-xl border border-primary/20">
+                     <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2"><Smartphone size={18} className="text-primary" /> Instalar App</h3>
+                     <button onClick={handleInstall} className="w-full py-2 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors shadow-lg">Instalar ahora</button>
+                  </div>
+                )}
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                   <h3 className="font-semibold text-gray-200 mb-2">Copia de Seguridad</h3>
+                   <button onClick={handleExport} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-white/10"><Download size={18} /> Descargar Backup</button>
+                </div>
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                   <h3 className="font-semibold text-gray-200 mb-2">Restaurar Datos</h3>
+                   <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-primary/20 hover:bg-primary/30 text-primary font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-primary/20"><Upload size={18} /> Importar Backup</button>
+                   <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv,.txt" className="hidden" />
+                   {importStatus && <p className={`text-xs text-center mt-2 ${importStatus.includes('Error') ? 'text-error' : 'text-green-400'}`}>{importStatus}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // --- MAIN APP ---
+      const App = () => {
+        const [transactions, setTransactions] = useState(() => {
+          const saved = localStorage.getItem('finvibe_transactions');
+          return saved ? JSON.parse(saved) : [];
+        });
+        const [period, setPeriod] = useState('day');
+        const [currentDate, setCurrentDate] = useState(new Date());
+        const [isModalOpen, setIsModalOpen] = useState(false);
+        const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+        const [installPrompt, setInstallPrompt] = useState(null);
+        const [activeChartType, setActiveChartType] = useState('expense');
+
+        useEffect(() => { localStorage.setItem('finvibe_transactions', JSON.stringify(transactions)); }, [transactions]);
+        useEffect(() => {
+          const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+          window.addEventListener('beforeinstallprompt', handler);
+          return () => window.removeEventListener('beforeinstallprompt', handler);
+        }, []);
+
+        const handleNavigate = (direction) => setCurrentDate(prev => shiftDate(prev, period, direction));
+        const handleAddTransaction = (amount, categoryId, note, date) => {
+          const newTransaction = { id: crypto.randomUUID(), amount, categoryId, note, date };
+          setTransactions(prev => [...prev, newTransaction]);
+        };
+        const handleDeleteTransaction = (id) => setTransactions(prev => prev.filter(t => t.id !== id));
+        const handleImportTransactions = (imported) => {
+          setTransactions(prev => {
+            const existingIds = new Set(prev.map(t => t.id));
+            const newUnique = imported.filter(t => !existingIds.has(t.id));
+            return [...prev, ...newUnique];
+          });
+        };
+        const filteredTransactions = useMemo(() => filterTransactionsByPeriod(transactions, currentDate, period), [transactions, currentDate, period]);
+        const stats = useMemo(() => {
+          let income = 0;
+          let expense = 0;
+          filteredTransactions.forEach(t => {
+            const cat = ALL_CATEGORIES.find(c => c.id === t.categoryId);
+            if (cat?.type === 'income') income += Number(t.amount);
+            else if (cat?.type === 'expense') expense += Number(t.amount);
+          });
+          return { income, expense, balance: income - expense };
+        }, [filteredTransactions]);
+
+        return (
+          <div className="min-h-screen pb-6 bg-background text-gray-100 max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
+            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-white/5 shadow-md">
+              <div className="flex items-center justify-between px-4 py-2">
+                <h1 className="text-base font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">FinVibe</h1>
+                <button onClick={() => setIsDataModalOpen(true)} className="p-1.5 text-gray-400 hover:text-white transition-colors"><Settings size={18} /></button>
+              </div>
+              <div className="px-4 pb-2 space-y-2">
+                <PeriodSelector currentPeriod={period} onChange={setPeriod} />
+                <DateNavigation currentDate={currentDate} period={period} onNavigate={handleNavigate} />
+              </div>
+            </div>
+            <div className="pt-3 flex-1 animate-fade-in">
+              <div className="mb-3"><SummaryCards stats={stats} /></div>
+              <div className="mb-3 px-4"><div className="bg-surface rounded-2xl p-2 shadow-sm border border-white/5"><ChartSection transactions={filteredTransactions} activeType={activeChartType} onToggle={() => setActiveChartType(prev => prev === 'expense' ? 'income' : 'expense')} /></div></div>
+              <div className="px-4 mb-4">
+                <button onClick={() => setIsModalOpen(true)} className="w-full py-3 bg-primary text-black font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"><Plus size={20} strokeWidth={3} /> Añadir Transacción</button>
+              </div>
+              <TransactionList transactions={filteredTransactions} onDelete={handleDeleteTransaction} />
+            </div>
+            <AddModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAddTransaction} initialType={activeChartType} />
+            <DataModal isOpen={isDataModalOpen} onClose={() => setIsDataModalOpen(false)} transactions={transactions} onImport={handleImportTransactions} installPrompt={installPrompt} onInstallClear={() => setInstallPrompt(null)} />
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
