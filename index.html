@@ -92,7 +92,7 @@
     <script type="text/babel" data-type="module">
       import React, { useState, useEffect, useMemo, useRef } from 'react';
       import ReactDOM from 'react-dom/client';
-      import { Plus, Settings, ChevronLeft, ChevronRight, Trash2, Layers, List, X, Check, Download, Upload, AlertTriangle, Smartphone } from 'lucide-react';
+      import { Plus, Settings, ChevronLeft, ChevronRight, Trash2, Layers, List, X, Check, Download, Upload, AlertTriangle, Smartphone, RefreshCw } from 'lucide-react';
       import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
       // --- CONSTANTS ---
@@ -194,21 +194,40 @@
           const cleanCatName = `"${categoryName}"`;
           return [t.id, t.date, type, cleanCatName, t.amount.toString(), cleanNote, t.categoryId].join(',');
         });
-        return [headers.join(','), ...rows].join('\n');
+        // Add BOM for Excel UTF-8 compatibility
+        return '\uFEFF' + [headers.join(','), ...rows].join('\n');
       };
 
       const parseCSVToTransactions = (csvText) => {
-        const lines = csvText.trim().split('\n');
+        // Handle different line endings (Windows/Unix)
+        const lines = csvText.trim().split(/\r?\n/);
         if (lines.length < 2) return [];
+        
+        // Detect delimiter: check header line for semicolon
+        const header = lines[0];
+        const separator = header.includes(';') ? ';' : ',';
+
         const transactions = [];
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
           if (!line.trim()) continue;
-          const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          
+          let cols;
+          // Robust split based on separator
+          if (separator === ';') {
+             // For semicolon, we assume standard split or quote handling
+             const regex = new RegExp(`${separator}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+             cols = line.split(regex).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          } else {
+             // Standard CSV comma split
+             cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+          }
+          
           if (cols.length < 5) continue;
           const [id, date, typeStr, catName, amountStr, note, catId] = cols;
-          const amount = parseFloat(amountStr);
+          const amount = parseFloat(amountStr.replace(',', '.')); // Handle decimal comma in amounts
           if (isNaN(amount)) continue;
+          
           let finalCatId = catId;
           if (!finalCatId || !ALL_CATEGORIES.find(c => c.id === finalCatId)) {
              const found = ALL_CATEGORIES.find(c => c.name.toLowerCase() === catName.toLowerCase());
@@ -473,10 +492,13 @@
         );
       };
 
-      const DataModal = ({ isOpen, onClose, transactions, onImport, installPrompt, onInstallClear }) => {
+      const DataModal = ({ isOpen, onClose, transactions, onImport, installPrompt, onInstallClear, onClearAll }) => {
         const fileInputRef = useRef(null);
         const [importStatus, setImportStatus] = useState('');
+        const [showClearConfirm, setShowClearConfirm] = useState(false);
+        
         if (!isOpen) return null;
+        
         const handleExport = () => {
           const csvContent = exportTransactionsToCSV(transactions);
           const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -488,22 +510,32 @@
           link.click();
           document.body.removeChild(link);
         };
+        
         const handleFileChange = (e) => {
           const file = e.target.files?.[0];
+          // Clear input value so same file can be selected again
+          e.target.value = ''; 
           if (!file) return;
+          
           const reader = new FileReader();
           reader.onload = (event) => {
             try {
               const parsedTransactions = parseCSVToTransactions(event.target?.result);
               if (parsedTransactions.length > 0) {
-                onImport(parsedTransactions);
-                setImportStatus(`¡Éxito! ${parsedTransactions.length} transacciones.`);
-                setTimeout(() => { onClose(); setImportStatus(''); }, 1500);
-              } else setImportStatus('Error: No hay datos válidos.');
+                const stats = onImport(parsedTransactions);
+                setImportStatus(`Completado: ${stats.added} añadidas, ${stats.skipped} duplicadas omitidas.`);
+                setTimeout(() => { 
+                   if(isOpen) { // Only close if still looking at it
+                     onClose(); 
+                     setImportStatus(''); 
+                   }
+                }, 2500);
+              } else setImportStatus('Error: No se encontraron datos válidos.');
             } catch (err) { setImportStatus('Error al leer el archivo.'); }
           };
           reader.readAsText(file);
         };
+        
         const handleInstall = async () => {
           if (!installPrompt) return;
           installPrompt.prompt();
@@ -512,9 +544,15 @@
           if (outcome === 'accepted') onClose();
         };
 
+        const handleClearAll = () => {
+            onClearAll();
+            setShowClearConfirm(false);
+            onClose();
+        }
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-surface w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up border border-white/10">
+            <div className="bg-surface w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up border border-white/10 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white flex items-center gap-2"><Settings className="text-primary" size={24} /> Ajustes</h2><button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white"><X size={20} /></button></div>
               <div className="space-y-4">
                 {installPrompt && (
@@ -529,9 +567,31 @@
                 </div>
                 <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                    <h3 className="font-semibold text-gray-200 mb-2">Restaurar Datos</h3>
+                   <div className="flex items-start gap-2 mb-3 bg-blue-500/10 p-2 rounded-lg">
+                      <RefreshCw size={14} className="text-blue-400 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-blue-200/80">
+                        Solo se añadirán transacciones nuevas. Las existentes no se duplicarán.
+                      </p>
+                   </div>
                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-primary/20 hover:bg-primary/30 text-primary font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-primary/20"><Upload size={18} /> Importar Backup</button>
-                   <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv,.txt" className="hidden" />
+                   <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv,.txt,text/csv,application/vnd.ms-excel" className="hidden" />
                    {importStatus && <p className={`text-xs text-center mt-2 ${importStatus.includes('Error') ? 'text-error' : 'text-green-400'}`}>{importStatus}</p>}
+                </div>
+
+                <div className="pt-2 border-t border-white/5">
+                    {!showClearConfirm ? (
+                        <button onClick={() => setShowClearConfirm(true)} className="w-full py-3 text-error/80 hover:text-error hover:bg-error/10 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors">
+                            <Trash2 size={16} /> Borrar todos los datos
+                        </button>
+                    ) : (
+                        <div className="bg-error/10 p-3 rounded-xl border border-error/20 animate-fade-in">
+                            <p className="text-xs text-error mb-2 text-center font-bold">¿Estás seguro? Se borrará todo.</p>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-2 bg-white/10 text-white rounded-lg text-xs">Cancelar</button>
+                                <button onClick={handleClearAll} className="flex-1 py-2 bg-error text-white rounded-lg text-xs font-bold">Sí, borrar todo</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -565,12 +625,29 @@
           setTransactions(prev => [...prev, newTransaction]);
         };
         const handleDeleteTransaction = (id) => setTransactions(prev => prev.filter(t => t.id !== id));
+        
+        const handleClearAllData = () => {
+             setTransactions([]);
+             localStorage.removeItem('finvibe_transactions');
+        };
+
         const handleImportTransactions = (imported) => {
+          let added = 0;
+          let skipped = 0;
           setTransactions(prev => {
             const existingIds = new Set(prev.map(t => t.id));
-            const newUnique = imported.filter(t => !existingIds.has(t.id));
-            return [...prev, ...newUnique];
+            const toAdd = [];
+            imported.forEach(t => {
+                if(!existingIds.has(t.id)) {
+                    toAdd.push(t);
+                    added++;
+                } else {
+                    skipped++;
+                }
+            });
+            return [...prev, ...toAdd];
           });
+          return { added, skipped };
         };
         const filteredTransactions = useMemo(() => filterTransactionsByPeriod(transactions, currentDate, period), [transactions, currentDate, period]);
         const stats = useMemo(() => {
@@ -605,7 +682,15 @@
               <TransactionList transactions={filteredTransactions} onDelete={handleDeleteTransaction} />
             </div>
             <AddModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAddTransaction} initialType={activeChartType} />
-            <DataModal isOpen={isDataModalOpen} onClose={() => setIsDataModalOpen(false)} transactions={transactions} onImport={handleImportTransactions} installPrompt={installPrompt} onInstallClear={() => setInstallPrompt(null)} />
+            <DataModal 
+                isOpen={isDataModalOpen} 
+                onClose={() => setIsDataModalOpen(false)} 
+                transactions={transactions} 
+                onImport={handleImportTransactions} 
+                installPrompt={installPrompt} 
+                onInstallClear={() => setInstallPrompt(null)} 
+                onClearAll={handleClearAllData}
+            />
           </div>
         );
       };
